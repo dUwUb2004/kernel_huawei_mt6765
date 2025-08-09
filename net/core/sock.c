@@ -142,6 +142,10 @@
 #include <net/tcp.h>
 #include <net/busy_poll.h>
 
+#ifdef CONFIG_HW_DPIMARK_MODULE
+#include <hwnet/hw_dpi_mark/dpi_hw_hook.h>
+#endif
+
 static DEFINE_MUTEX(proto_list_mutex);
 static LIST_HEAD(proto_list);
 
@@ -987,8 +991,13 @@ set_rcvbuf:
 	case SO_MARK:
 		if (!ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN))
 			ret = -EPERM;
-		else
+		else {
+#ifdef CONFIG_HW_DPIMARK_MODULE
+			sk->sk_mark = get_mplk_somark(sk, val);
+#else
 			sk->sk_mark = val;
+#endif
+		}
 		break;
 
 	case SO_RXQ_OVFL:
@@ -1533,11 +1542,24 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 			get_net(net);
 		sock_net_set(sk, net);
 		refcount_set(&sk->sk_wmem_alloc, 1);
+#ifdef CONFIG_HW_DPIMARK_MODULE
+		sk->sk_hwdpi_mark = 0;
+#endif
 
 		mem_cgroup_sk_alloc(sk);
 		cgroup_sk_alloc(&sk->sk_cgrp_data);
+
+#ifdef CONFIG_HW_NETQOS_SCHED
+		sk->sk_netqos_level = -1;
+		sk->sk_netqos_time = 0;
+#endif
+
 		sock_update_classid(&sk->sk_cgrp_data);
 		sock_update_netprioidx(&sk->sk_cgrp_data);
+
+#ifdef CONFIG_CGROUP_BPF
+		*(sk->sk_process_name) = '\0';
+#endif
 	}
 
 	return sk;
