@@ -1824,6 +1824,11 @@ static int loop_add(struct loop_device **l, int i)
 		goto out_free_dev;
 	i = err;
 
+	if (i >= (int)(1UL << (MINORBITS - part_shift))) {
+		err = -ERANGE;
+		goto out_free_idr;
+	}
+
 	err = -ENOMEM;
 	lo->tag_set.ops = &loop_mq_ops;
 	lo->tag_set.nr_hw_queues = 1;
